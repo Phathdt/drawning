@@ -1,19 +1,36 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import {
-    ArrowUpRight, Circle, Eraser, MousePointer, Pen, Redo2, Square, Type, Undo2
-} from 'lucide-react';
-import { getStroke } from 'perfect-freehand';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+  ArrowUpRight,
+  Circle,
+  Eraser,
+  MousePointer,
+  Pen,
+  Redo2,
+  Square,
+  Type,
+  Undo2,
+} from 'lucide-react'
+import { getStroke } from 'perfect-freehand'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/button'
 import {
-    Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 import {
-    DrawingElement, DrawingOptions, getElementTypeFromTool, HistoryState, Point, ToolOption
-} from './types';
-import { MAX_HISTORY_LENGTH } from './utils';
+  DrawingElement,
+  DrawingOptions,
+  getElementTypeFromTool,
+  HistoryState,
+  Point,
+  ToolOption,
+} from './types'
+import { MAX_HISTORY_LENGTH } from './utils'
 
 const TOOLS: ToolOption[] = [
   { id: 'pen', icon: <Pen size={20} />, name: 'Pen' },
@@ -350,7 +367,6 @@ const DrawingCanvas: React.FC = () => {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // Draw completed elements
     history.present
       .filter((element) => !element.isDeleted)
       .forEach((element) => {
@@ -360,7 +376,6 @@ const DrawingCanvas: React.FC = () => {
         }
       })
 
-    // Draw current element
     if (currentElement) {
       drawShape(ctx, currentElement)
     }
