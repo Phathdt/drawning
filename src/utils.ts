@@ -14,3 +14,5 @@ export const getSvgPathFromStroke = (points: Point[]): string => {
 
   return d.join(' ')
 }
+
+export const MAX_HISTORY_LENGTH = 50

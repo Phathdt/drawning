@@ -7,7 +7,6 @@ export type Tool =
   | 'eraser'
   | 'select'
 
-// Separate ElementType from Tool because not all tools create elements
 export type ElementType = 'stroke' | 'rectangle' | 'ellipse' | 'arrow' | 'text'
 
 export interface ToolOption {
@@ -40,10 +39,15 @@ export interface DrawingElement {
   points?: Point[]
   text?: string
   options: DrawingOptions
-  isDeleted?: boolean // Add this for soft delete with eraser
+  isDeleted?: boolean
 }
 
-// Drawing element specific types
+export interface HistoryState {
+  past: DrawingElement[][]
+  present: DrawingElement[]
+  future: DrawingElement[][]
+}
+
 export interface RectElement extends DrawingElement {
   type: 'rectangle'
 }
@@ -73,7 +77,6 @@ export const getElementTypeFromTool = (tool: Tool): ElementType | null => {
       return 'arrow'
     case 'text':
       return 'text'
-    // eraser and select don't create elements
     case 'eraser':
     case 'select':
       return null

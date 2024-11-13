@@ -1,5 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { ArrowUpRight, Circle, Eraser, MousePointer, Pen, Square, Type } from 'lucide-react';
+import {
+    ArrowUpRight, Circle, Eraser, MousePointer, Pen, Redo2, Square, Type, Undo2
+} from 'lucide-react';
 import { getStroke } from 'perfect-freehand';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -8,7 +10,10 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
 
-import { DrawingElement, DrawingOptions, getElementTypeFromTool, Point, ToolOption } from './types';
+import {
+    DrawingElement, DrawingOptions, getElementTypeFromTool, HistoryState, Point, ToolOption
+} from './types';
+import { MAX_HISTORY_LENGTH } from './utils';
 
 const TOOLS: ToolOption[] = [
   { id: 'pen', icon: <Pen size={20} />, name: 'Pen' },
@@ -26,6 +31,12 @@ const DrawingCanvas: React.FC = () => {
   const [currentElement, setCurrentElement] = useState<DrawingElement | null>(
     null
   )
+
+  const [history, setHistory] = useState<HistoryState>({
+    past: [],
+    present: [],
+    future: [],
+  })
   const [elements, setElements] = useState<DrawingElement[]>([])
   const [selectedElement, setSelectedElement] = useState<DrawingElement | null>(
     null
@@ -52,6 +63,44 @@ const DrawingCanvas: React.FC = () => {
 
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
+  }, [])
+
+  const updateHistory = useCallback((newElements: DrawingElement[]) => {
+    setHistory((prev) => ({
+      past: [...prev.past, prev.present].slice(-MAX_HISTORY_LENGTH),
+      present: newElements,
+      future: [],
+    }))
+  }, [])
+
+  const undo = useCallback(() => {
+    setHistory((prev) => {
+      if (prev.past.length === 0) return prev
+
+      const newPast = prev.past.slice(0, -1)
+      const newPresent = prev.past[prev.past.length - 1]
+
+      return {
+        past: newPast,
+        present: newPresent,
+        future: [prev.present, ...prev.future],
+      }
+    })
+  }, [])
+
+  const redo = useCallback(() => {
+    setHistory((prev) => {
+      if (prev.future.length === 0) return prev
+
+      const newFuture = prev.future.slice(1)
+      const newPresent = prev.future[0]
+
+      return {
+        past: [...prev.past, prev.present],
+        present: newPresent,
+        future: newFuture,
+      }
+    })
   }, [])
 
   const getCoordinates = (e: React.MouseEvent | React.TouchEvent): Point => {
@@ -111,23 +160,16 @@ const DrawingCanvas: React.FC = () => {
 
   const handleEraser = useCallback(
     (point: Point) => {
-      const canvas = canvasRef.current
-      if (!canvas) return
-
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-
       const eraserRadius = options.strokeWidth * 5
-      setElements((prevElements) =>
-        prevElements.map((element) => {
-          if (isPointNearElement(point, element, eraserRadius)) {
-            return { ...element, isDeleted: true }
-          }
-          return element
-        })
-      )
+      const newElements = history.present.map((element) => {
+        if (isPointNearElement(point, element, eraserRadius)) {
+          return { ...element, isDeleted: true }
+        }
+        return element
+      })
+      updateHistory(newElements)
     },
-    [options.strokeWidth]
+    [options.strokeWidth, history.present, updateHistory]
   )
 
   const handleSelection = useCallback(
@@ -212,9 +254,10 @@ const DrawingCanvas: React.FC = () => {
     if (!isDrawing || !currentElement) return
 
     setIsDrawing(false)
-    setElements((prev) => [...prev, currentElement])
+    const newElements = [...history.present, currentElement]
+    updateHistory(newElements)
     setCurrentElement(null)
-  }, [isDrawing, currentElement])
+  }, [isDrawing, currentElement, history.present, updateHistory])
 
   const drawShape = useCallback(
     (ctx: CanvasRenderingContext2D, element: DrawingElement) => {
@@ -307,24 +350,40 @@ const DrawingCanvas: React.FC = () => {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    elements
+    // Draw completed elements
+    history.present
       .filter((element) => !element.isDeleted)
       .forEach((element) => {
         drawShape(ctx, element)
-
         if (selectedElement?.id === element.id) {
           drawSelectionBox(ctx, element)
         }
       })
 
+    // Draw current element
     if (currentElement) {
       drawShape(ctx, currentElement)
     }
-  }, [elements, currentElement, selectedElement, drawShape])
+  }, [history.present, currentElement, selectedElement, drawShape])
 
   useEffect(() => {
     renderCanvas()
   }, [renderCanvas])
+
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+        if (e.shiftKey) {
+          redo()
+        } else {
+          undo()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyboard)
+    return () => window.removeEventListener('keydown', handleKeyboard)
+  }, [undo, redo])
 
   const handleTextSubmit = useCallback(
     (text: string) => {
@@ -339,12 +398,13 @@ const DrawingCanvas: React.FC = () => {
           text,
           options: { ...options },
         }
-        setElements((prev) => [...prev, textElement])
+        const newElements = [...history.present, textElement]
+        updateHistory(newElements)
         setTextPosition(null)
         setInputText('')
       }
     },
-    [textPosition, options]
+    [textPosition, options, history.present, updateHistory]
   )
 
   const drawSelectionBox = (
@@ -380,12 +440,12 @@ const DrawingCanvas: React.FC = () => {
   }
 
   const clearCanvas = useCallback(() => {
-    setElements([])
+    updateHistory([])
     setCurrentElement(null)
     setSelectedElement(null)
     setTextPosition(null)
     setInputText('')
-  }, [])
+  }, [updateHistory])
 
   const undoLastElement = useCallback(() => {
     setElements((prev) => prev.slice(0, -1))
@@ -406,6 +466,24 @@ const DrawingCanvas: React.FC = () => {
               {tool.icon}
             </Button>
           ))}
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            onClick={undo}
+            disabled={history.past.length === 0}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 size={20} />
+          </Button>
+
+          <Button
+            onClick={redo}
+            disabled={history.future.length === 0}
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <Redo2 size={20} />
+          </Button>
         </div>
 
         <Select
