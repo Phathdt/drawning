@@ -1,5 +1,11 @@
+import DrawingCanvas from './drawning-canvas';
+
 function App() {
-  return <></>
+  return (
+    <>
+      <DrawingCanvas />
+    </>
+  )
 }
 
 export default App
